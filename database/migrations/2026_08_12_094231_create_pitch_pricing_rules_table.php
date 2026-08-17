@@ -36,13 +36,13 @@ return new class extends Migration
             $table->enum('min_deposit_type', ['percentage', 'fixed', 'full'])->default('percentage');
             $table->decimal('min_deposit_amount', 10, 2)->default(50.00);
 
-            // Rule activation toggle
-            $table->boolean('is_active')->default(true);
+            // Rule activation toggle (Unifying status enum)
+            $table->enum('status', ['active', 'maintenance', 'inactive'])->default('active');
 
             $table->timestamps();
 
             // Composite index for fast pricing calculation
-            $table->index(['pitch_id', 'day_of_week', 'is_active']);
+            $table->index(['pitch_id', 'day_of_week', 'status']);
         });
     }
 

@@ -21,6 +21,7 @@ return new class extends Migration
 
             // Pitch basic info
             $table->string('name');
+            $table->text('description')->nullable();
 
             // Sport category: football, padel, tennis, squash, basketball, volleyball, etc.
             $table->string('sport_type', 50)->default('football');
@@ -38,12 +39,11 @@ return new class extends Migration
             $table->json('amenities')->nullable();
 
             // Operational status
-            $table->boolean('is_active')->default(true);
-
+            $table->enum('status', ['active', 'maintenance', 'inactive'])->default('active');
             $table->timestamps();
 
-            // Index for fast search and filtering
-            $table->index(['tenant_id', 'sport_type', 'is_active']);
+            // Index for fast search and filtering (تم تعديل is_active إلى status)
+            $table->index(['tenant_id', 'sport_type', 'status']);
         });
     }
 

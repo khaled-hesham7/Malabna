@@ -20,6 +20,7 @@ return new class extends Migration
             // Basic venue info
             $table->string('name');
             $table->string('slug')->unique();
+            $table->string('company_name')->nullable(); // تم إزالة ->after('slug')
             $table->text('description')->nullable();
 
             // Contact and location details

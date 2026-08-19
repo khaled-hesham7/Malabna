@@ -18,7 +18,7 @@ class PitchPricingRuleFactory extends Factory
             'price_per_hour' => fake()->randomElement([200.00, 250.00, 300.00]),
             'min_deposit_type' => 'percentage',
             'min_deposit_amount' => 25.00, // 25% عربون
-            'status'       => $this->faker->randomElement(['active', 'maintenance', 'inactive']),
+            'status' => $this->faker->randomElement(['active', 'inactive']),
         ];
     }
 }

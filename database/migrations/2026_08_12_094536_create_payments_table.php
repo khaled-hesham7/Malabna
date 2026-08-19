@@ -6,9 +6,6 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('payments', function (Blueprint $table) {
@@ -29,8 +26,8 @@ return new class extends Migration
             $table->decimal('amount', 10, 2);
             $table->string('currency', 10)->default('EGP');
 
-            // Status
-            $table->enum('status', ['pending', 'successful', 'failed', 'refunded'])->default('pending');
+            // Status (استبدال successful بـ completed للتوافق)
+            $table->enum('status', ['pending', 'completed', 'failed', 'refunded'])->default('pending');
 
             // Gateway full response payload
             $table->json('payload')->nullable();
@@ -42,9 +39,6 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('payments');

@@ -13,6 +13,7 @@ class TenantFactory extends Factory
             'name' => $name,
             'slug' => \Illuminate\Support\Str::slug($name),
             'company_name' => $name,
+            'city' => $this->faker->city(), // <-- أضف هذا السطر هنا
             'phone' => fake()->phoneNumber(),
             'address' => fake()->address(),
             'latitude' => fake()->latitude(29.9, 30.1),
@@ -21,7 +22,8 @@ class TenantFactory extends Factory
             'subscription_expires_at' => now()->addYear(),
             'commission_type' => 'percentage',
             'commission_rate' => 10.00,
-            'status'       => $this->faker->randomElement(['active', 'maintenance', 'inactive']),
+            // 'status'       => $this->faker->randomElement(['active', 'maintenance', 'inactive']),
+            'status' => 'active'
         ];
     }
 }

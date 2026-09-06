@@ -17,15 +17,18 @@ class PitchSlotFactory extends Factory
         $endTime = (clone $startTime)->addHour();
 
         return [
-            'pitch_id'          => Pitch::factory(),
-            'date'              => now()->addDays(fake()->numberBetween(0, 7))->format('Y-m-d'),
-            'start_time'        => $startTime->format('H:i:s'),
-            'end_time'          => $endTime->format('H:i:s'),
-            'price'             => 250.00,
-            'status'            => 'available', // available, locked, booked, unavailable
-            'is_visible_online' => true,
-            'locked_by_user_id' => null,
-            'locked_until'      => null,
+            'pitch_id'                => Pitch::factory(),
+            'date'                    => now()->addDays(fake()->numberBetween(0, 7))->format('Y-m-d'),
+            'start_time'              => $startTime->format('H:i:s'),
+            'end_time'                => $endTime->format('H:i:s'),
+            'manual_price'            => 250.00,
+            'online_price'            => 220.00,
+            'status'                  => 'available',
+            'is_recurring'            => false,
+            'recurring_customer_name' => null,
+            'recurring_schedule_id'   => null,
+            'locked_by_user_id'       => null,
+            'locked_until'            => null,
         ];
     }
 
@@ -33,7 +36,6 @@ class PitchSlotFactory extends Factory
     public function locked(): static
     {
         return $this->state(fn (array $attributes) => [
-            'status'            => 'locked',
             'locked_by_user_id' => User::factory(),
             'locked_until'      => now()->addMinutes(10),
         ]);

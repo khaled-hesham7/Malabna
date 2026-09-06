@@ -14,13 +14,13 @@ return new class extends Migration
         Schema::create('tenants', function (Blueprint $table) {
             $table->id();
 
-            // Venue owner relation
-            $table->unsignedBigInteger('owner_id')->nullable();
+            // Venue owner relation (بدون constraint مباشر لمنع تضارب الترتيب مع جدول users)
+            $table->unsignedBigInteger('owner_id')->nullable()->index();
 
             // Basic venue info
             $table->string('name');
             $table->string('slug')->unique();
-            $table->string('company_name')->nullable(); // تم إزالة ->after('slug')
+            $table->string('company_name')->nullable();
             $table->text('description')->nullable();
 
             // Contact and location details
@@ -30,7 +30,7 @@ return new class extends Migration
             $table->decimal('latitude', 10, 8)->nullable();
             $table->decimal('longitude', 11, 8)->nullable();
 
-            // Approval status by super admin
+            // Operational & Approval status by super admin
             $table->enum('status', ['pending', 'active', 'suspended', 'rejected'])->default('pending');
             $table->text('rejection_reason')->nullable();
 
@@ -46,7 +46,9 @@ return new class extends Migration
 
             // Booking settings
             $table->unsignedInteger('cancellation_deadline_hours')->default(6);
+            $table->string('currency', 3)->default('EGP');
 
+            $table->softDeletes();
             $table->timestamps();
 
             // Indexes for fast search

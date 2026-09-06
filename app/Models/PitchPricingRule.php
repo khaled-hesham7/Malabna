@@ -5,12 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
-use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class PitchPricingRule extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     protected $fillable = [
         'pitch_id',
@@ -18,36 +18,59 @@ class PitchPricingRule extends Model
         'day_of_week',
         'start_time',
         'end_time',
-        'price_per_hour',
+        'manual_price_per_hour',
+        'online_price_per_hour',
         'min_deposit_type',
         'min_deposit_amount',
         'status',
     ];
 
     protected $casts = [
-        'day_of_week'        => 'integer',
-        'price_per_hour'     => 'decimal:2',
-        'min_deposit_amount' => 'decimal:2',
+        'day_of_week'           => 'integer',
+        'manual_price_per_hour' => 'decimal:2',
+        'online_price_per_hour' => 'decimal:2',
+        'min_deposit_amount'    => 'decimal:2',
     ];
 
+    // =====================
     // Relationships
+    // =====================
+
+    /** الملعب الذي تنتمي إليه هذه القاعدة */
     public function pitch(): BelongsTo
     {
         return $this->belongsTo(Pitch::class);
     }
 
-    public function tenant(): HasOneThrough
+    /** النادي المالك للملعب (عبر الملعب) */
+    public function tenant(): BelongsTo
     {
-        return $this->hasOneThrough(Tenant::class, Pitch::class, 'id', 'id', 'pitch_id', 'tenant_id');
+        return $this->belongsTo(Tenant::class, 'tenant_id')
+            ->through('pitch'); // through pitch → pitch.tenant_id
+        // ملاحظة: استخدم $this->pitch->tenant للوصول المباشر في الكود
+        // أو استخدم HasOneThrough مع تحديد المفاتيح بدقة إذا احتجت eager loading
     }
 
+    // =====================
     // Scopes
-    public function scopeActive(Builder $query): Builder
+    // =====================
+
+    /** القواعد النشطة فقط */
+    public function scopeActive(\Illuminate\Database\Eloquent\Builder $query): \Illuminate\Database\Eloquent\Builder
     {
         return $query->where('status', 'active');
     }
 
-    // Helper: حساب قيمة العربون المطلوبة بناءً على إجمالي السعر
+    // =====================
+    // Helpers
+    // =====================
+
+    /**
+     * احسب قيمة العربون المطلوبة بناءً على إجمالي السعر.
+     * percentage: نسبة مئوية من الإجمالي
+     * fixed: مبلغ ثابت (بحد أقصى الإجمالي)
+     * full: الدفع الكامل
+     */
     public function calculateDepositAmount(float $totalPrice): float
     {
         return match ($this->min_deposit_type) {

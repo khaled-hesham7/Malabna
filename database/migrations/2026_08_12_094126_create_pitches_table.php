@@ -23,26 +23,30 @@ return new class extends Migration
             $table->string('name');
             $table->text('description')->nullable();
 
-            // Sport category: football, padel, tennis, squash, basketball, volleyball, etc.
+            // Sport category & specifications
             $table->string('sport_type', 50)->default('football');
-
-            // Court size/spec: 5_a_side, 7_a_side, single, double, full_court, etc.
-            $table->string('court_size', 50)->nullable();
-
-            // Surface material: artificial_grass, natural_grass, tartan, wood, acrylic, clay
+            $table->string('court_size', 50)->nullable(); // 5_a_side, 7_a_side, etc.
             $table->string('surface_type', 50)->nullable();
-
-            // Indoor or Outdoor court
             $table->boolean('is_indoor')->default(false);
 
-            // Extra amenities as JSON array (e.g. ["lighting", "racket_rentals", "showers"])
+            // 💰 Default Pricing Strategy (أسعار النهار والليل الافتراضية)
+            $table->decimal('manual_day_price', 8, 2)->default(150.00);   // سعر المانويل (صبح)
+            $table->decimal('manual_night_price', 8, 2)->default(250.00); // سعر المانويل (بليل)
+            $table->decimal('online_day_price', 8, 2)->default(140.00);   // سعر الأونلاين (صبح)
+            $table->decimal('online_night_price', 8, 2)->default(230.00); // سعر الأونلاين (بليل)
+
+            // 🕒 Night Period Start Time (وقت بداية الفترة المسائية)
+            $table->time('night_start_at')->default('16:00:00'); // الساعة 4 عصراً افتراضياً
+
+            // Extra amenities as JSON array
             $table->json('amenities')->nullable();
 
             // Operational status
             $table->enum('status', ['active', 'maintenance', 'inactive'])->default('active');
+            $table->softDeletes();
             $table->timestamps();
 
-            // Index for fast search and filtering (تم تعديل is_active إلى status)
+            // Index for fast search and filtering
             $table->index(['tenant_id', 'sport_type', 'status']);
         });
     }

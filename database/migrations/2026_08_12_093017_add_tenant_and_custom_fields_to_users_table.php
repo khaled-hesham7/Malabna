@@ -19,9 +19,6 @@ return new class extends Migration
                 ->constrained('tenants')
                 ->nullOnDelete();
 
-            // Main contact phone number for booking and login
-            $table->string('phone', 20)->unique()->after('name');
-
             // Make email optional if user registers with phone only
             $table->string('email')->nullable()->change();
 
@@ -37,6 +34,16 @@ return new class extends Migration
             $table->enum('status', ['active', 'inactive', 'banned'])
                 ->default('active')
                 ->after('user_type');
+
+            $table->softDeletes();
+        });
+
+        // 🔒 إضافة Foreign Key لـ owner_id في جدول tenants بعد ما Users بقى جاهز
+        Schema::table('tenants', function (Blueprint $table) {
+            $table->foreign('owner_id')
+                ->references('id')
+                ->on('users')
+                ->nullOnDelete();
         });
     }
 
@@ -45,11 +52,17 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // فك ربط Foreign Key من جدول tenants أولاً
+        Schema::table('tenants', function (Blueprint $table) {
+            $table->dropForeign(['owner_id']);
+        });
+
+        // إزالة الحقول والعلاقات من جدول users
         Schema::table('users', function (Blueprint $table) {
             $table->dropForeign(['tenant_id']);
+            $table->dropSoftDeletes();
             $table->dropColumn([
                 'tenant_id',
-                'phone',
                 'user_type',
                 'status'
             ]);

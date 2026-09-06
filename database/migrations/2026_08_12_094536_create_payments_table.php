@@ -14,12 +14,28 @@ return new class extends Migration
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
 
+            // Direct link to tenant for fast multi-tenant financial reporting
+            $table->foreignId('tenant_id')
+                ->constrained('tenants')
+                ->cascadeOnDelete();
+
             // Link payment to booking
             $table->foreignId('booking_id')
                 ->constrained('bookings')
-                ->cascadeOnDelete();
+                ->restrictOnDelete();
 
-            // Payment provider: paymob, fawry, instapay, cash, etc.
+            // Staff or Customer who recorded/processed this payment
+            $table->foreignId('created_by_user_id')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
+
+            $table->string('payment_code')->nullable()->unique();
+
+            // Payment classification: deposit (عربون), full (كامل), remaining (باقي الحجز)
+            $table->enum('payment_type', ['deposit', 'full', 'remaining', 'refund'])->default('full');
+
+            // Payment method/provider: paymob, fawry, instapay, vodafone_cash, cash
             $table->string('payment_method', 50)->default('cash');
 
             // Gateway external reference ID
@@ -29,15 +45,20 @@ return new class extends Migration
             $table->decimal('amount', 10, 2);
             $table->string('currency', 10)->default('EGP');
 
-            // Status
-            $table->enum('status', ['pending', 'successful', 'failed', 'refunded'])->default('pending');
+            // Payment status
+            $table->enum('status', ['pending', 'completed', 'failed', 'refunded'])->default('pending');
 
-            // Gateway full response payload
+            $table->text('notes')->nullable();
+            $table->timestamp('paid_at')->nullable();
+
+            // Gateway full response payload for audit & webhooks
             $table->json('payload')->nullable();
 
+            $table->softDeletes();
             $table->timestamps();
 
-            // Index
+            // Indexes for accounting & reports performance
+            $table->index(['tenant_id', 'status', 'payment_method']);
             $table->index(['booking_id', 'status']);
         });
     }

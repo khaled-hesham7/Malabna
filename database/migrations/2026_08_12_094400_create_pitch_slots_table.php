@@ -19,37 +19,51 @@ return new class extends Migration
                 ->constrained('pitches')
                 ->cascadeOnDelete();
 
-            // Slot date and timing
+            // Slot date and timing (تنسيق 24 ساعة)
             $table->date('date');
             $table->time('start_time');
             $table->time('end_time');
 
-            // Calculated price for this specific slot
-            $table->decimal('price', 10, 2);
+            // 💰 Dual Pricing (سعر المانويل وسعر الأونلاين المخصص للساعة دي)
+            $table->decimal('manual_price', 8, 2);
+            $table->decimal('online_price', 8, 2);
 
-            // Slot availability status
+            // 🔒 Detailed Blocking & Availability Statuses
+            // available: متاحة للجميع
+            // booked: محجوزة بالفعل
+            // blocked_all: مقفولة تماماً (صيانة/عطل)
+            // blocked_online: مقفولة للأونلاين فقط ومتاحة للمباشر/اللوحة
+            // blocked_manual: مقفولة لليدوي ومتاحة للأونلاين فقط
             $table->enum('status', [
                 'available',
-                'locked',
                 'booked',
-                'maintenance',
-                'hidden'
+                'blocked_all',
+                'blocked_online',
+                'blocked_manual'
             ])->default('available');
 
-            // Hide slot from online mobile app/public web
-            $table->boolean('is_visible_online')->default(true);
+            // 🔁 Recurring / Fixed Slot Flag (التثبيت الدوري)
+            $table->boolean('is_recurring')->default(false);
+            $table->string('recurring_customer_name')->nullable();
+            // FK constraint added after recurring_schedules table is created
+            // (see migration: add_recurring_schedule_foreign_keys)
+            $table->unsignedBigInteger('recurring_schedule_id')->nullable();
 
-            // Concurrency lock fields (holds slot while user is paying)
-            $table->unsignedBigInteger('locked_by_user_id')->nullable();
+            // ⏱️ Concurrency Lock Fields (حظر المؤقت أثناء غلق عملية الشراء أونلاين)
+            $table->foreignId('locked_by_user_id')
+                ->nullable()
+                ->constrained('users')
+                ->nullOnDelete();
             $table->timestamp('locked_until')->nullable();
 
+            $table->softDeletes();
             $table->timestamps();
 
             // Unique constraint to prevent duplicate slots for same pitch and time
             $table->unique(['pitch_id', 'date', 'start_time'], 'pitch_slot_unique');
 
-            // Indexes for fast calendar queries and online filtering
-            $table->index(['pitch_id', 'date', 'status', 'is_visible_online'], 'slot_visibility_idx');
+            // Index for high-performance availability searches
+            $table->index(['pitch_id', 'date', 'status'], 'slot_search_idx');
         });
     }
 

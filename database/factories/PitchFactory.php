@@ -15,7 +15,15 @@ class PitchFactory extends Factory
             'sport_type' => fake()->randomElement(['football', 'padel', 'tennis']),
             'court_size' => fake()->randomElement(['5v5', '7v7', 'Standard']),
             'surface_type' => fake()->randomElement(['Artificial Grass', 'Acrylic', 'Clay']),
+            'is_indoor' => fake()->boolean(),
             'description' => 'ملعب مجهز بأعلى مستويات الإضاءة والأرضيات المعتمدة.',
-'status'       => $this->faker->randomElement(['active', 'maintenance', 'inactive']),        ];
+            'manual_day_price' => 150.00,
+            'manual_night_price' => 250.00,
+            'online_day_price' => 140.00,
+            'online_night_price' => 230.00,
+            'night_start_at' => '16:00:00',
+            'amenities' => ['lighting', 'parking', 'shower'],
+            'status' => $this->faker->randomElement(['active', 'maintenance', 'inactive']),
+        ];
     }
 }

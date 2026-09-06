@@ -15,13 +15,15 @@ class TenantFactory extends Factory
             'company_name' => $name,
             'phone' => fake()->phoneNumber(),
             'address' => fake()->address(),
+            'city' => 'Cairo',
+            'currency' => 'EGP',
             'latitude' => fake()->latitude(29.9, 30.1),
             'longitude' => fake()->longitude(31.1, 31.4),
             'subscription_price' => fake()->randomElement([1000.00, 1500.00, 2000.00]),
             'subscription_expires_at' => now()->addYear(),
             'commission_type' => 'percentage',
             'commission_rate' => 10.00,
-            'status'       => $this->faker->randomElement(['active', 'maintenance', 'inactive']),
+            'status'       => $this->faker->randomElement(['pending', 'active', 'suspended', 'rejected']),
         ];
     }
 }

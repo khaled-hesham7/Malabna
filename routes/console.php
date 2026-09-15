@@ -1,8 +1,18 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+/*
+|--------------------------------------------------------------------------
+| Console Commands & Task Scheduler (جدولة المهام المجمّعة في الخلفية)
+|--------------------------------------------------------------------------
+*/
+
+// 1. توليد الساعات المجمّعة لجميع الملاعب النشطة يومياً في منتصف الليل لـ 60 يوماً مقدماً
+Schedule::command('slots:generate --days=60')->dailyAt('00:00');
+
+// 2. فك القفل المؤقت عن الفترات المنتهية المهلة أوتوماتيكياً كل دقيقة
+Schedule::command('slots:release-locks')->everyMinute();
+
+// 3. تطبيق وتسكين الحجوزات الأسبوعية الثابتة أسبوعياً لـ 8 أسابيع مقدماً
+Schedule::command('schedules:apply --weeks=8')->weekly();

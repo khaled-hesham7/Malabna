@@ -22,18 +22,10 @@ return new class extends Migration
             // Make email optional if user registers with phone only
             $table->string('email')->nullable()->change();
 
-            // High-level user account type
-            $table->enum('user_type', [
-                'super_admin',
-                'tenant_owner',
-                'tenant_staff',
-                'customer'
-            ])->default('customer')->after('password');
-
             // Account status
             $table->enum('status', ['active', 'inactive', 'banned'])
                 ->default('active')
-                ->after('user_type');
+                ->after('password');
 
             $table->softDeletes();
         });
@@ -63,7 +55,6 @@ return new class extends Migration
             $table->dropSoftDeletes();
             $table->dropColumn([
                 'tenant_id',
-                'user_type',
                 'status'
             ]);
         });

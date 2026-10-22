@@ -20,10 +20,10 @@ class DatabaseSeeder extends Seeder
     public function run(): void
     {
         // 1. إنشاء الأدوار الأساسية (Spatie Roles)
-        $superAdminRole  = Role::firstOrCreate(['name' => 'super_admin', 'guard_name' => 'web']);
-        $tenantOwnerRole = Role::firstOrCreate(['name' => 'tenant_owner', 'guard_name' => 'web']);
-        $tenantStaffRole = Role::firstOrCreate(['name' => 'tenant_staff', 'guard_name' => 'web']);
-        $playerRole      = Role::firstOrCreate(['name' => 'player', 'guard_name' => 'web']);
+        $superAdminRole  = Role::firstOrCreate(['name' => 'super_admin']);
+        $tenantOwnerRole = Role::firstOrCreate(['name' => 'tenant_owner']);
+        $tenantStaffRole = Role::firstOrCreate(['name' => 'tenant_staff']);
+        $playerRole      = Role::firstOrCreate(['name' => 'player']);
 
         // 2. إنشاء السوبر أدمن (Super Admin)
         $admin = User::create([
@@ -31,7 +31,6 @@ class DatabaseSeeder extends Seeder
             'email'     => 'admin@malabna.com',
             'phone'     => '01000000000',
             'password'  => Hash::make('password'),
-            'user_type' => 'super_admin',
             'status'    => 'active',
         ]);
         $admin->assignRole($superAdminRole);
@@ -62,7 +61,6 @@ class DatabaseSeeder extends Seeder
             'email'     => 'owner@zamalek.com',
             'phone'     => '01012345678',
             'password'  => Hash::make('password'),
-            'user_type' => 'tenant_owner',
             'status'    => 'active',
         ]);
         $owner->assignRole($tenantOwnerRole);
@@ -75,7 +73,6 @@ class DatabaseSeeder extends Seeder
             'email'     => 'staff@zamalek.com',
             'phone'     => '01155554444',
             'password'  => Hash::make('password'),
-            'user_type' => 'tenant_staff',
             'status'    => 'active',
         ]);
         $staff->assignRole($tenantStaffRole);
@@ -86,7 +83,6 @@ class DatabaseSeeder extends Seeder
             'email'     => 'player@gmail.com',
             'phone'     => '01200000000',
             'password'  => Hash::make('password'),
-            'user_type' => 'customer',
             'status'    => 'active',
         ]);
         $player->assignRole($playerRole);

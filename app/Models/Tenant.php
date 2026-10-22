@@ -9,10 +9,19 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
+use Spatie\Sluggable\HasSlug;
+use Spatie\Sluggable\SlugOptions;
 
 class Tenant extends Model implements HasMedia
 {
-    use HasFactory, InteractsWithMedia, SoftDeletes;
+    use HasFactory, InteractsWithMedia, SoftDeletes, HasSlug;
+
+    public function getSlugOptions(): SlugOptions
+    {
+        return SlugOptions::create()
+            ->generateSlugsFrom('name')
+            ->saveSlugsTo('slug');
+    }
 
     protected $fillable = [
         'owner_id',
@@ -25,6 +34,7 @@ class Tenant extends Model implements HasMedia
         'address',
         'latitude',
         'longitude',
+        'preferred_plan',
         'status',
         'rejection_reason',
         'subscription_price',

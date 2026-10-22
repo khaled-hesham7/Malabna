@@ -90,6 +90,7 @@ class Pitch extends Model implements HasMedia
     // =====================
     public function registerMediaCollections(): void
     {
-        $this->addMediaCollection('gallery');
+        $this->addMediaCollection('images');
+        $this->addMediaCollection('videos');
     }
 }

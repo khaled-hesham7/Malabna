@@ -31,7 +31,7 @@ return new class extends Migration
             $table->decimal('longitude', 11, 8)->nullable();
 
             // Operational & Approval status by super admin
-            $table->enum('status', ['pending', 'active', 'suspended', 'rejected'])->default('pending');
+            $table->enum('status', ['pending', 'awaiting_payment', 'active', 'suspended', 'rejected'])->default('pending');
             $table->text('rejection_reason')->nullable();
 
             // Custom subscription set by super admin

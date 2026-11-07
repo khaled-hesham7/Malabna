@@ -55,10 +55,22 @@ class PitchSlot extends Model
         return $this->belongsTo(User::class, 'locked_by_user_id');
     }
 
-    /** الحجز المرتبط بهذه الفترة (إن وُجد) */
+    /**
+     * الحجز النشط المرتبط بهذه الفترة (إن وُجد وغير ملغي).
+     */
     public function booking(): HasOne
     {
-        return $this->hasOne(Booking::class, 'pitch_slot_id');
+        return $this->hasOne(Booking::class, 'pitch_slot_id')
+            ->where('status', '!=', 'cancelled')
+            ->latestOfMany();
+    }
+
+    /**
+     * جميع الحجوزات السابقة والحالية المرتبطة بهذه الفترة (سجل تاريخي).
+     */
+    public function bookings()
+    {
+        return $this->hasMany(Booking::class, 'pitch_slot_id');
     }
 
     /**
@@ -96,5 +108,13 @@ class PitchSlot extends Model
     {
         return $query->whereNotNull('locked_until')
             ->where('locked_until', '<', now());
+    }
+
+    /**
+     * هل هذه الفترة مقفولة مؤقتاً لعميل أثناء الدفع؟
+     */
+    public function isLocked(): bool
+    {
+        return $this->locked_until !== null && $this->locked_until->isFuture();
     }
 }

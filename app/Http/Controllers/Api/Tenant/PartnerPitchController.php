@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\Api\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Partner\PitchFilterRequest;
 use App\Http\Requests\Partner\StorePitchRequest;
+use App\Http\Requests\Partner\TogglePitchStatusRequest;
 use App\Http\Requests\Partner\UpdatePitchRequest;
 use App\Http\Resources\PitchResource;
 use App\Models\Pitch;
@@ -17,7 +19,7 @@ class PartnerPitchController extends Controller
     /**
      * List all pitches belonging to the authenticated partner's venue
      */
-    public function index(Request $request): JsonResponse
+    public function index(PitchFilterRequest $request): JsonResponse
     {
         $tenant = $request->user()->tenant;
 
@@ -76,9 +78,12 @@ class PartnerPitchController extends Controller
                 'manual_night_price' => $validated['manual_night_price'],
                 'online_day_price'   => $validated['online_day_price'],
                 'online_night_price' => $validated['online_night_price'],
-                'night_start_at'     => $validated['night_start_at'] ?? '16:00:00',
-                'amenities'          => $validated['amenities'] ?? [],
-                'status'             => $validated['status'] ?? 'active',
+                'night_start_at'        => $validated['night_start_at'] ?? '16:00:00',
+                'opening_time'          => $validated['opening_time'] ?? '08:00:00',
+                'closing_time'          => $validated['closing_time'] ?? '02:00:00',
+                'slot_duration_minutes' => $validated['slot_duration_minutes'] ?? 60,
+                'amenities'             => $validated['amenities'] ?? [],
+                'status'                => $validated['status'] ?? 'active',
             ]);
 
             // 2. رفع الصور المتعددة
@@ -95,9 +100,18 @@ class PartnerPitchController extends Controller
                 }
             }
 
+            // 4. توليد الساعات تلقائياً لمدة 30 يوماً فور إنشاء الملعب إذا كان نشطاً
+            if ($pitch->status === 'active') {
+                app(\App\Services\PitchSlotService::class)->generateSlotForDateRange(
+                    $pitch,
+                    now()->toDateString(),
+                    now()->addDays(30)->toDateString()
+                );
+            }
+
             return response()->json([
                 'success' => true,
-                'message' => 'تم إنشاء الملعب بنجاح ورفع وسائطه.',
+                'message' => 'تم إنشاء الملعب وتوليد فترات الحجز بنجاح.',
                 'data'    => new PitchResource($pitch->fresh(['media'])),
             ], 201);
         });
@@ -128,7 +142,10 @@ class PartnerPitchController extends Controller
         return DB::transaction(function () use ($request, $pitch) {
             $validated = $request->validated();
 
-            $pitch->update($validated);
+            // استبعاد حقول الميديا من التحديث لأنها ليست أعمدة في قاعدة البيانات
+            $pitch->update(collect($validated)->except([
+                'images', 'videos', 'replace_images', 'replace_videos', 'delete_media_ids',
+            ])->toArray());
 
             // 1. التعامل مع الصور: استبدال أو إضافة
             if ($request->hasFile('images')) {
@@ -182,6 +199,29 @@ class PartnerPitchController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'تم حذف الملعب بنجاح.',
+        ]);
+    }
+
+    /**
+     * Toggle or set pitch operational status (active, maintenance, inactive)
+     */
+    public function toggleStatus(TogglePitchStatusRequest $request, Pitch $pitch): JsonResponse
+    {
+        $this->authorizeTenantPitch($request, $pitch);
+
+        // إذا تم تحديد حالة معينة نطبقها، وإلا نقلب الحالة بين active و inactive
+        if ($request->filled('status')) {
+            $newStatus = $request->status;
+        } else {
+            $newStatus = $pitch->status === 'active' ? 'inactive' : 'active';
+        }
+
+        $pitch->update(['status' => $newStatus]);
+
+        return response()->json([
+            'success' => true,
+            'message' => "تم تغيير حالة الملعب إلى ({$newStatus}) بنجاح.",
+            'data'    => new PitchResource($pitch->fresh(['media'])),
         ]);
     }
 

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Admin\AdminTenantIndexRequest;
 use App\Http\Requests\Admin\ApproveTenantRequest;
 use App\Http\Requests\Admin\RejectTenantRequest;
 use App\Http\Resources\TenantResource;
@@ -16,7 +17,7 @@ class AdminTenantApprovalController extends Controller
     /**
      * List all venue partner applications filtered by status
      */
-    public function index(Request $request): JsonResponse
+    public function index(AdminTenantIndexRequest $request): JsonResponse
     {
         $status = $request->query('status');
 

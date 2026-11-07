@@ -146,51 +146,69 @@ class BookingService
     }
 
     /**
-     * إلغاء حجز قائم وفحص استحقاق الاسترداد
+     * إلغاء حجز قائم وفحص استحقاق الاسترداد (يدعم الحجز اليدوي المباشر والأونلاين)
      */
-    public function cancelBooking(Booking $booking, string $reason = 'طلب العميل الإلغاء', ?User $cancelledByUser = null): bool
+    public function cancelBooking(Booking $booking, string $reason = 'طلب العميل الإلغاء', ?User $cancelledByUser = null, ?bool $refundDeposit = null): bool
     {
         if ($booking->status === 'cancelled') {
             return false;
         }
 
-        return DB::transaction(function () use ($booking, $reason, $cancelledByUser) {
+        return DB::transaction(function () use ($booking, $reason, $cancelledByUser, $refundDeposit) {
             $slot = $booking->slot;
             $tenant = $booking->tenant;
+            $paidAmount = (float) $booking->paid_amount;
 
-            // 1. فحص هل الإلغاء مسموح به قبل المهلة الشروطة (cancellation_deadline_hours)
-            $bookingTime = Carbon::parse($slot->date->toDateString() . ' ' . $slot->start_time);
-            $hoursUntilMatch = now()->diffInHours($bookingTime, false);
+            // تحديد هل يستحق استرداد المبلغ
+            if ($booking->booking_type === 'manual') {
+                // للحجز اليدوي المباشر، صاحب الملعب يحدد صراحة هل يرد العربون كاش أم يصادره
+                $shouldRefund = ($refundDeposit === true);
+                $paymentMethod = 'cash';
+            } else {
+                // للحجز الأونلاين، يتم الاعتماد على المهلة الزمنية المحددة للنادي ما لم يتم تمرير قرار صريح
+                if ($refundDeposit !== null) {
+                    $shouldRefund = $refundDeposit;
+                } else {
+                    $bookingTime = Carbon::parse($slot->date->toDateString() . ' ' . $slot->start_time);
+                    $hoursUntilMatch = now()->diffInHours($bookingTime, false);
+                    $shouldRefund = $hoursUntilMatch >= ($tenant->cancellation_deadline_hours ?? 6);
+                }
+                $paymentMethod = 'online_gateway';
+            }
 
-            $isEligibleForRefund = $hoursUntilMatch >= ($tenant->cancellation_deadline_hours ?? 6);
-
-            // 2. إن كان مستحقاً للمبلغ وكان مدفوعاً سابقاً، يتم تسجيل عملية استرداد refund
-            if ($isEligibleForRefund && $booking->paid_amount > 0) {
+            // إذا كان يستحق استرداد وكان هناك مبلغ مدفوع، نسجل حركة استرداد مالي
+            if ($shouldRefund && $paidAmount > 0) {
                 Payment::create([
                     'tenant_id'          => $tenant->id,
                     'booking_id'         => $booking->id,
                     'created_by_user_id' => $cancelledByUser?->id,
                     'payment_code'       => 'REF-' . strtoupper(Str::random(6)),
-                    'amount'             => $booking->paid_amount,
+                    'amount'             => $paidAmount,
                     'currency'           => $tenant->currency ?? 'EGP',
-                    'payment_method'     => 'online_gateway',
+                    'payment_method'     => $paymentMethod,
                     'payment_type'       => 'refund',
                     'status'             => 'completed',
-                    'notes'              => 'استرداد مالي لإلغاء الحجز قبل المهلة الشروطة',
+                    'notes'              => 'استرداد مالي لإلغاء الحجز: ' . $reason,
                     'paid_at'            => now(),
                 ]);
             }
 
-            // 3. تحديث حالة الحجز لـ cancelled
+            $refundNote = $shouldRefund ? ' (تم رد المبلغ للعميل)' : ' (تم الاحتفاظ بالعربون/المبلغ)';
+
+            // تحديث حالة الحجز لـ cancelled
             $booking->update([
                 'status'              => 'cancelled',
-                'cancellation_reason' => $reason . ($isEligibleForRefund ? ' (مستحق للاسترداد)' : ' (غير مستحق للاسترداد - إلغاء متأخر)'),
+                'cancellation_reason' => $reason . $refundNote,
                 'cancelled_at'        => now(),
             ]);
 
-            // 4. إعادة فتح الفترة الزمنية فوراً لتصبح متاحة للحجز مجدداً
+            // إعادة فتح الفترة الزمنية فوراً لتصبح متاحة للحجز مجدداً
             if ($slot) {
-                $this->slotService->updateSlotStatus($slot, 'available');
+                $slot->update([
+                    'status'            => 'available',
+                    'locked_by_user_id' => null,
+                    'locked_until'      => null,
+                ]);
             }
 
             return true;

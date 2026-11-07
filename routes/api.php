@@ -50,7 +50,35 @@ Route::prefix('v1')->group(function () {
         Route::post('/', [\App\Http\Controllers\Api\Tenant\PartnerPitchController::class, 'store']);
         Route::get('{pitch}', [\App\Http\Controllers\Api\Tenant\PartnerPitchController::class, 'show']);
         Route::post('{pitch}', [\App\Http\Controllers\Api\Tenant\PartnerPitchController::class, 'update']); // POST to support multipart/form-data with media files
+        Route::patch('{pitch}/toggle-status', [\App\Http\Controllers\Api\Tenant\PartnerPitchController::class, 'toggleStatus']);
         Route::delete('{pitch}', [\App\Http\Controllers\Api\Tenant\PartnerPitchController::class, 'destroy']);
+
+        // جدول الساعات والتحكم في اليوم
+        Route::get('{pitch}/slots', [\App\Http\Controllers\Api\Tenant\PartnerSlotController::class, 'index']);
+        Route::post('{pitch}/slots/toggle-day', [\App\Http\Controllers\Api\Tenant\PartnerSlotController::class, 'toggleBlockDay']);
+    });
+
+    // =====================================
+    // 4. Partner Slot Actions (Single Slot Block & Manual Booking)
+    // =====================================
+    Route::prefix('partner/slots')->middleware(['auth:sanctum', 'role:tenant_owner|tenant_staff'])->group(function () {
+        Route::patch('{slot}/toggle-block', [\App\Http\Controllers\Api\Tenant\PartnerSlotController::class, 'toggleBlockSlot']);
+        Route::patch('{slot}/update-price', [\App\Http\Controllers\Api\Tenant\PartnerSlotController::class, 'updatePrice']);
+        Route::post('{slot}/manual-book', [\App\Http\Controllers\Api\Tenant\PartnerSlotController::class, 'manualBook']);
+        Route::post('{slot}/cancel-booking', [\App\Http\Controllers\Api\Tenant\PartnerSlotController::class, 'cancelBooking']);
+    });
+
+    // =====================================
+    // 5. Partner Recurring Schedules (الحجوزات الأسبوعية الثابتة)
+    // =====================================
+    Route::prefix('partner/recurring-schedules')->middleware(['auth:sanctum', 'role:tenant_owner|tenant_staff'])->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\Tenant\PartnerRecurringScheduleController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Api\Tenant\PartnerRecurringScheduleController::class, 'store']);
+        Route::get('{recurringSchedule}', [\App\Http\Controllers\Api\Tenant\PartnerRecurringScheduleController::class, 'show']);
+        Route::match(['put', 'patch'], '{recurringSchedule}', [\App\Http\Controllers\Api\Tenant\PartnerRecurringScheduleController::class, 'update']);
+        Route::patch('{recurringSchedule}/toggle-pause', [\App\Http\Controllers\Api\Tenant\PartnerRecurringScheduleController::class, 'togglePause']);
+        Route::delete('{recurringSchedule}', [\App\Http\Controllers\Api\Tenant\PartnerRecurringScheduleController::class, 'destroy']);
+        Route::post('{recurringSchedule}/release-date', [\App\Http\Controllers\Api\Tenant\PartnerRecurringScheduleController::class, 'releaseDate']);
     });
 
     // =====================================

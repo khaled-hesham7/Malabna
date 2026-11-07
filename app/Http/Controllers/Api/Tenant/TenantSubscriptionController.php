@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Partner\PaySubscriptionRequest;
+use App\Http\Resources\SubscriptionPaymentResource;
 use App\Http\Resources\TenantResource;
 use App\Models\SubscriptionPayment;
 use Illuminate\Http\JsonResponse;
@@ -44,13 +46,8 @@ class TenantSubscriptionController extends Controller
      * Complete and confirm subscription payment (Hybrid or Subscription-only model)
      * Simulates payment gateway callback/confirmation and activates the venue
      */
-    public function pay(Request $request): JsonResponse
+    public function pay(PaySubscriptionRequest $request): JsonResponse
     {
-        $request->validate([
-            'payment_method' => ['required', 'string', 'in:visa,mastercard,vodafone_cash,fawry,bank_transfer'],
-            'transaction_id' => ['nullable', 'string'],
-        ]);
-
         $user = $request->user();
         $tenant = $user->tenant;
 
@@ -104,7 +101,7 @@ class TenantSubscriptionController extends Controller
                 'data'    => [
                     'redirect_url' => '/partner/dashboard',
                     'tenant'       => new TenantResource($tenant->fresh()),
-                    'payment'      => $payment,
+                    'payment'      => new SubscriptionPaymentResource($payment),
                 ],
             ]);
         });

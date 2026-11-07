@@ -28,17 +28,21 @@ class Pitch extends Model implements HasMedia
         'online_day_price',
         'online_night_price',
         'night_start_at',
+        'opening_time',
+        'closing_time',
+        'slot_duration_minutes',
         'amenities',
         'status',
     ];
 
     protected $casts = [
-        'is_indoor'          => 'boolean',
-        'manual_day_price'   => 'decimal:2',
-        'manual_night_price' => 'decimal:2',
-        'online_day_price'   => 'decimal:2',
-        'online_night_price' => 'decimal:2',
-        'amenities'          => 'array',
+        'is_indoor'             => 'boolean',
+        'slot_duration_minutes' => 'integer',
+        'manual_day_price'      => 'decimal:2',
+        'manual_night_price'    => 'decimal:2',
+        'online_day_price'      => 'decimal:2',
+        'online_night_price'    => 'decimal:2',
+        'amenities'             => 'array',
     ];
 
     // =====================

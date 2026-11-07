@@ -24,8 +24,11 @@ class StorePitchRequest extends FormRequest
             'manual_night_price'   => ['required', 'numeric', 'min:0'],
             'online_day_price'     => ['required', 'numeric', 'min:0'],
             'online_night_price'   => ['required', 'numeric', 'min:0'],
-            'night_start_at'       => ['required', 'date_format:H:i', 'nullable'],
-            'amenities'            => ['nullable', 'array'],
+            'night_start_at'        => ['required', 'date_format:H:i'],
+            'opening_time'          => ['nullable', 'date_format:H:i'],
+            'closing_time'          => ['nullable', 'date_format:H:i'],
+            'slot_duration_minutes' => ['nullable', 'integer', 'in:30,45,60,90,120'],
+            'amenities'             => ['nullable', 'array'],
             'amenities.*'          => ['string', 'max:100'],
             'status'               => ['nullable', 'in:active,maintenance,inactive'],
             // دعم رفع صور وفيديوهات متعددة

@@ -71,6 +71,7 @@ Route::prefix('v1')->group(function () {
     // =====================================
     // 5. Partner Recurring Schedules (الحجوزات الأسبوعية الثابتة)
     // =====================================
+
     Route::prefix('partner/recurring-schedules')->middleware(['auth:sanctum', 'role:tenant_owner|tenant_staff'])->group(function () {
         Route::get('/', [\App\Http\Controllers\Api\Tenant\PartnerRecurringScheduleController::class, 'index']);
         Route::post('/', [\App\Http\Controllers\Api\Tenant\PartnerRecurringScheduleController::class, 'store']);
@@ -82,7 +83,30 @@ Route::prefix('v1')->group(function () {
     });
 
     // =====================================
-    // 3. Super Admin Approval Routes
+    // 6. Partner Staff Management (إدارة موظفي المنشأة)
+    // =====================================
+    Route::prefix('partner/staff')->middleware(['auth:sanctum', 'role:tenant_owner'])->group(function () {
+        Route::get('permissions-list', [\App\Http\Controllers\Api\Tenant\PartnerStaffController::class, 'permissionsList']);
+        Route::get('/', [\App\Http\Controllers\Api\Tenant\PartnerStaffController::class, 'index']);
+        Route::post('/', [\App\Http\Controllers\Api\Tenant\PartnerStaffController::class, 'store']);
+        Route::get('{staff}', [\App\Http\Controllers\Api\Tenant\PartnerStaffController::class, 'show']);
+        Route::match(['put', 'patch'], '{staff}', [\App\Http\Controllers\Api\Tenant\PartnerStaffController::class, 'update']);
+        Route::patch('{staff}/toggle-status', [\App\Http\Controllers\Api\Tenant\PartnerStaffController::class, 'toggleStatus']);
+        Route::delete('{staff}', [\App\Http\Controllers\Api\Tenant\PartnerStaffController::class, 'destroy']);
+    });
+
+    // =====================================
+    // 7. Profile Management (الملف الشخصي للمستخدم الحالي)
+    // =====================================
+    Route::prefix('profile')->middleware('auth:sanctum')->group(function () {
+        Route::get('/', [\App\Http\Controllers\Api\Profile\ProfileController::class, 'show']);
+        Route::match(['put', 'patch'], '/', [\App\Http\Controllers\Api\Profile\ProfileController::class, 'update']);
+        Route::put('change-password', [\App\Http\Controllers\Api\Profile\ProfileController::class, 'changePassword']);
+        Route::post('avatar', [\App\Http\Controllers\Api\Profile\ProfileController::class, 'uploadAvatar']);
+    });
+
+    // =====================================
+    // 8. Super Admin Approval Routes
     // =====================================
     Route::prefix('admin')->middleware(['auth:sanctum', 'role:super_admin'])->group(function () {
         Route::get('tenants', [AdminTenantApprovalController::class, 'index']);

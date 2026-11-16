@@ -114,4 +114,13 @@ Route::prefix('v1')->group(function () {
         Route::post('tenants/{tenant}/approve', [AdminTenantApprovalController::class, 'approve']);
         Route::post('tenants/{tenant}/reject', [AdminTenantApprovalController::class, 'reject']);
     });
+
+    // =====================================
+    // 9. Player Exploration & Marketplace Routes (عام للمتصفحين واللاعبين)
+    // =====================================
+    Route::prefix('player')->group(function () {
+        Route::get('explore', [\App\Http\Controllers\Api\Player\PlayerPitchExploreController::class, 'explore']);
+        Route::get('pitches/{pitch}', [\App\Http\Controllers\Api\Player\PlayerPitchExploreController::class, 'show']);
+        Route::get('pitches/{pitch}/available-slots', [\App\Http\Controllers\Api\Player\PlayerPitchExploreController::class, 'availableSlots']);
+    });
 });

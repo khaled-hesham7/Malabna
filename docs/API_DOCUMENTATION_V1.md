@@ -654,33 +654,41 @@
   "data": {
     "data": [
       {
-        "id": 5,
-        "name": "الملعب الرئيسي (نجيل هولندي)",
-        "sport_type": "football",
-        "court_size": "5x5",
-        "surface_type": "artificial_turf",
-        "is_indoor": false,
-        "online_day_price": 230.00,
-        "online_night_price": 380.00,
-        "primary_image_url": "http://127.0.0.1:8000/storage/...",
-        "distance_km": 1.4, // المسافة بالكيلومتر من موقع اللاعب الحالي
-        "venue": {
-          "id": 1,
-          "name": "نادي الزمالك - فرع ميت عقبة",
-          "city": "الجيزة",
-          "address": "شارع جامعة الدول العربية، المهندسين",
-          "logo_url": "http://127.0.0.1:8000/storage/...",
-          "latitude": 30.0583,
-          "longitude": 31.2014
-        },
-        "matched_slots": [
+        "id": 1,
+        "name": "نادي الزمالك - فرع ميت عقبة",
+        "slug": "nady-alzmalk-fraa-myt-aakb",
+        "city": "الجيزة",
+        "address": "شارع جامعة الدول العربية، ميت عقبة، المهندسين، الجيزة",
+        "phone": "01199998888",
+        "logo_url": "http://127.0.0.1:8000/storage/...",
+        "distance_km": 0.8, // المسافة بالكيلومتر من موقع اللاعب الحالي (مرتب تصاعدياً من الأقرب للأبعد)
+        "sports_available": ["football", "padel"],
+        "starting_price": 280.00, // أقل سعر يبدأ به الحجز في النادي
+        "pitches_count": 2,
+        "pitches": [
           {
-            "id": 618,
-            "date": "2026-11-20",
-            "start_time": "20:00",
-            "end_time": "21:00",
-            "time_label": "20:00 - 21:00",
-            "price": 380.00
+            "id": 1,
+            "name": "ملعب حلمي زامورا (خماسي)",
+            "sport_type": "football",
+            "court_size": "5v5",
+            "surface_type": "Artificial Grass",
+            "is_indoor": false,
+            "online_day_price": 280.00,
+            "online_night_price": 320.00,
+            "starting_price": 280.00,
+            "primary_image_url": "http://127.0.0.1:8000/storage/..."
+          },
+          {
+            "id": 2,
+            "name": "ملعب البادل الرئيسي",
+            "sport_type": "padel",
+            "court_size": "Standard",
+            "surface_type": "Turf",
+            "is_indoor": true,
+            "online_day_price": 380.00,
+            "online_night_price": 420.00,
+            "starting_price": 380.00,
+            "primary_image_url": null
           }
         ]
       }

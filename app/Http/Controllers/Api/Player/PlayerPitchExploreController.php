@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Api\Player;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Player\ExplorePitchesRequest;
-use App\Http\Resources\Player\ExplorePitchResource;
+use App\Http\Resources\Player\ExploreVenueResource;
 use App\Http\Resources\Player\PlayerPitchDetailResource;
 use App\Models\Pitch;
 use App\Models\PitchSlot;
+use App\Models\Tenant;
 use App\Services\PitchSlotService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -23,97 +24,96 @@ class PlayerPitchExploreController extends Controller
     }
 
     /**
-     * استكشاف والبحث في الملاعب بالأقرب مسافة والوقت المتاح
+     * استكشاف وتصفح النوادي والملاعب بالأقرب مسافة والوقت المتاح
      * GET /api/v1/player/explore
      */
     public function explore(ExplorePitchesRequest $request): JsonResponse
     {
-        $query = Pitch::query()
-            ->join('tenants', 'pitches.tenant_id', '=', 'tenants.id')
-            ->where('pitches.status', 'active')
+        $query = Tenant::query()
             ->where('tenants.status', 'active')
             ->whereNull('tenants.deleted_at')
-            ->whereNull('pitches.deleted_at');
+            ->whereHas('pitches', function ($q) {
+                $q->where('status', 'active');
+            });
 
-        // 1. حساب المسافة الجغرافية (Haversine Formula بالكيلومتر)
+        // 1. حساب المسافة الجغرافية بالكيلومتر (Haversine Formula) وترتيب الأقرب أولاً
         $hasCoords = $request->filled(['latitude', 'longitude']);
         if ($hasCoords) {
             $lat = (float) $request->latitude;
             $lng = (float) $request->longitude;
 
-            // معادلة هافيرسين لحساب المسافة بدقة ومنع أخطاء تجاوز النطاق (ACos Domain error)
             $haversine = "(6371 * acos(least(1.0, greatest(-1.0, cos(radians(?)) * cos(radians(tenants.latitude)) * cos(radians(tenants.longitude) - radians(?)) + sin(radians(?)) * sin(radians(tenants.latitude))))))";
 
-            $query->select('pitches.*')
+            $query->select('tenants.*')
                 ->selectRaw("{$haversine} AS distance", [$lat, $lng, $lat])
                 ->whereNotNull('tenants.latitude')
                 ->whereNotNull('tenants.longitude');
 
-            // تصفية بأقصى مسافة إذا تم تحديدها
             if ($request->filled('max_distance')) {
                 $query->havingRaw("distance <= ?", [(float) $request->max_distance]);
             }
 
-            // الترتيب من الأقرب للأبعد
             $query->orderBy('distance', 'asc');
         } else {
-            $query->select('pitches.*')
-                ->orderByDesc('pitches.id');
+            $query->select('tenants.*')
+                ->latest('tenants.id');
         }
 
-        // 2. فلاتر الملعب العامة
-        if ($request->filled('sport_type')) {
-            $query->where('pitches.sport_type', $request->sport_type);
-        }
-
-        if ($request->filled('court_size')) {
-            $query->where('pitches.court_size', $request->court_size);
-        }
-
-        if ($request->filled('surface_type')) {
-            $query->where('pitches.surface_type', $request->surface_type);
-        }
-
-        if ($request->has('is_indoor') && $request->input('is_indoor') !== null) {
-            $query->where('pitches.is_indoor', $request->boolean('is_indoor'));
-        }
-
+        // 2. فلاتر المدينة والبحث
         if ($request->filled('city')) {
             $query->where('tenants.city', 'like', "%{$request->city}%");
-        }
-
-        if ($request->filled('max_price')) {
-            $maxPrice = (float) $request->max_price;
-            $query->where(function ($q) use ($maxPrice) {
-                $q->where('pitches.online_day_price', '<=', $maxPrice)
-                  ->orWhere('pitches.online_night_price', '<=', $maxPrice);
-            });
         }
 
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('pitches.name', 'like', "%{$search}%")
-                  ->orWhere('tenants.name', 'like', "%{$search}%")
-                  ->orWhere('tenants.address', 'like', "%{$search}%");
+                $q->where('tenants.name', 'like', "%{$search}%")
+                  ->orWhere('tenants.address', 'like', "%{$search}%")
+                  ->orWhereHas('pitches', fn ($sub) => $sub->where('status', 'active')->where('name', 'like', "%{$search}%"));
             });
         }
 
-        // 3. فلترة الوقت والميعاد الفاضي (Availability Filter)
+        // 3. فلاتر الملاعب (نوع الرياضة، المقاس، الأرضية، السعر)
+        if ($request->filled('sport_type')) {
+            $query->whereHas('pitches', fn ($q) => $q->where('status', 'active')->where('sport_type', $request->sport_type));
+        }
+
+        if ($request->filled('court_size')) {
+            $query->whereHas('pitches', fn ($q) => $q->where('status', 'active')->where('court_size', $request->court_size));
+        }
+
+        if ($request->filled('surface_type')) {
+            $query->whereHas('pitches', fn ($q) => $q->where('status', 'active')->where('surface_type', $request->surface_type));
+        }
+
+        if ($request->has('is_indoor') && $request->input('is_indoor') !== null) {
+            $query->whereHas('pitches', fn ($q) => $q->where('status', 'active')->where('is_indoor', $request->boolean('is_indoor')));
+        }
+
+        if ($request->filled('max_price')) {
+            $maxPrice = (float) $request->max_price;
+            $query->whereHas('pitches', function ($q) use ($maxPrice) {
+                $q->where('status', 'active')
+                  ->where(function ($sub) use ($maxPrice) {
+                      $sub->where('online_day_price', '<=', $maxPrice)
+                          ->orWhere('online_night_price', '<=', $maxPrice);
+                  });
+            });
+        }
+
+        // 4. فلترة التوفر باليوم والساعة (Availability Filter)
         $searchDate = $request->date;
         $searchTime = $request->time ? Carbon::parse($request->time)->format('H:i:s') : null;
         $timeFrom   = $request->time_from ? Carbon::parse($request->time_from)->format('H:i:s') : null;
         $timeTo     = $request->time_to ? Carbon::parse($request->time_to)->format('H:i:s') : null;
 
-        // إذا حدد وقتاً ولم يحدد تاريخاً، نبحث في تاريخ اليوم تلقائياً
         if (($searchTime || ($timeFrom && $timeTo)) && !$searchDate) {
             $searchDate = now()->toDateString();
         }
 
         if ($searchDate) {
-            $query->whereHas('slots', function ($q) use ($searchDate, $searchTime, $timeFrom, $timeTo) {
-                $q->availableOnline()
-                  ->where('date', $searchDate);
+            $query->whereHas('pitches.slots', function ($q) use ($searchDate, $searchTime, $timeFrom, $timeTo) {
+                $q->availableOnline()->where('date', $searchDate);
 
                 if ($searchTime) {
                     $q->where('start_time', $searchTime);
@@ -124,31 +124,35 @@ class PlayerPitchExploreController extends Controller
             });
         }
 
-        // تحميل العلاقات والساعات المتطابقة مع البحث
+        // تحميل العلاقات بكفاءة وبدون إرجاع الساعات (لتقليل حجم الـ Payload وسرعة الاستجابة)
         $query->with([
-            'tenant.media',
             'media',
-            'slots' => function ($q) use ($searchDate, $searchTime, $timeFrom, $timeTo) {
-                $q->availableOnline();
+            'pitches' => function ($q) use ($request, $searchDate, $searchTime, $timeFrom, $timeTo) {
+                $q->where('status', 'active')->with('media');
+
+                if ($request->filled('sport_type')) {
+                    $q->where('sport_type', $request->sport_type);
+                }
+
                 if ($searchDate) {
-                    $q->where('date', $searchDate);
+                    $q->whereHas('slots', function ($slotQ) use ($searchDate, $searchTime, $timeFrom, $timeTo) {
+                        $slotQ->availableOnline()->where('date', $searchDate);
+                        if ($searchTime) {
+                            $slotQ->where('start_time', $searchTime);
+                        } elseif ($timeFrom && $timeTo) {
+                            $slotQ->where('start_time', '>=', $timeFrom)->where('start_time', '<=', $timeTo);
+                        }
+                    });
                 }
-                if ($searchTime) {
-                    $q->where('start_time', $searchTime);
-                } elseif ($timeFrom && $timeTo) {
-                    $q->where('start_time', '>=', $timeFrom)
-                      ->where('start_time', '<=', $timeTo);
-                }
-                $q->orderBy('start_time');
             },
         ]);
 
         $perPage = (int) $request->input('per_page', 15);
-        $pitches = $query->paginate($perPage);
+        $venues = $query->paginate($perPage);
 
         return response()->json([
             'success' => true,
-            'data'    => ExplorePitchResource::collection($pitches)->response()->getData(true),
+            'data'    => ExploreVenueResource::collection($venues)->response()->getData(true),
         ]);
     }
 
@@ -167,7 +171,6 @@ class PlayerPitchExploreController extends Controller
             ], 404);
         }
 
-        // حساب المسافة إن أرسل اللاعب إحداثياته
         if ($request->filled(['latitude', 'longitude']) && $tenant->latitude && $tenant->longitude) {
             $lat = (float) $request->latitude;
             $lng = (float) $request->longitude;
@@ -266,4 +269,3 @@ class PlayerPitchExploreController extends Controller
         return $dist * 60 * 1.1515 * 1.609344;
     }
 }
-

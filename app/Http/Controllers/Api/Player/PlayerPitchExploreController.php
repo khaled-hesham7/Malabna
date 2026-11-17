@@ -9,10 +9,22 @@ use App\Http\Resources\Player\PlayerPitchDetailResource;
 use App\Models\Pitch;
 use App\Models\PitchSlot;
 use App\Models\Tenant;
+use App\QueryFilters\Venue\PitchCourtSizeFilter;
+use App\QueryFilters\Venue\PitchIndoorFilter;
+use App\QueryFilters\Venue\PitchMaxPriceFilter;
+use App\QueryFilters\Venue\PitchSportTypeFilter;
+use App\QueryFilters\Venue\PitchSurfaceTypeFilter;
+use App\QueryFilters\Venue\VenueAvailabilityFilter;
+use App\QueryFilters\Venue\VenueDistanceSort;
+use App\QueryFilters\Venue\VenueMaxDistanceFilter;
+use App\QueryFilters\Venue\VenueSearchFilter;
 use App\Services\PitchSlotService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Spatie\QueryBuilder\AllowedFilter;
+use Spatie\QueryBuilder\AllowedSort;
+use Spatie\QueryBuilder\QueryBuilder;
 
 class PlayerPitchExploreController extends Controller
 {
@@ -24,123 +36,104 @@ class PlayerPitchExploreController extends Controller
     }
 
     /**
-     * استكشاف وتصفح النوادي والملاعب بالأقرب مسافة والوقت المتاح
+     * استكشاف وتصفح النوادي والملاعب باستخدام Spatie QueryBuilder
      * GET /api/v1/player/explore
      */
     public function explore(ExplorePitchesRequest $request): JsonResponse
     {
-        $query = Tenant::query()
+        // 1. الاستعلام الأساسي: النوادي النشطة التي تحتوي على ملاعب نشطة
+        $baseQuery = Tenant::query()
             ->where('tenants.status', 'active')
             ->whereNull('tenants.deleted_at')
             ->whereHas('pitches', function ($q) {
                 $q->where('status', 'active');
             });
 
-        // 1. حساب المسافة الجغرافية بالكيلومتر (Haversine Formula) وترتيب الأقرب أولاً
-        $hasCoords = $request->filled(['latitude', 'longitude']);
+        // 2. إذا توفرت إحداثيات GPS، نقوم بحساب المسافة بالكيلومتر عبر Haversine
+        $lat = $request->input('latitude', $request->input('filter.latitude'));
+        $lng = $request->input('longitude', $request->input('filter.longitude'));
+        $hasCoords = !blank($lat) && !blank($lng);
+
         if ($hasCoords) {
-            $lat = (float) $request->latitude;
-            $lng = (float) $request->longitude;
+            $latFloat = (float) $lat;
+            $lngFloat = (float) $lng;
 
             $haversine = "(6371 * acos(least(1.0, greatest(-1.0, cos(radians(?)) * cos(radians(tenants.latitude)) * cos(radians(tenants.longitude) - radians(?)) + sin(radians(?)) * sin(radians(tenants.latitude))))))";
 
-            $query->select('tenants.*')
-                ->selectRaw("{$haversine} AS distance", [$lat, $lng, $lat])
+            $baseQuery->select('tenants.*')
+                ->selectRaw("{$haversine} AS distance", [$latFloat, $lngFloat, $latFloat])
                 ->whereNotNull('tenants.latitude')
                 ->whereNotNull('tenants.longitude');
-
-            if ($request->filled('max_distance')) {
-                $query->havingRaw("distance <= ?", [(float) $request->max_distance]);
-            }
-
-            $query->orderBy('distance', 'asc');
         } else {
-            $query->select('tenants.*')
-                ->latest('tenants.id');
+            $baseQuery->select('tenants.*');
         }
 
-        // 2. فلاتر المدينة والبحث
-        if ($request->filled('city')) {
-            $query->where('tenants.city', 'like', "%{$request->city}%");
+        // 3. بناء الفلاتر والترتيب عبر Spatie QueryBuilder
+        $queryBuilder = QueryBuilder::for($baseQuery, $request)
+            ->allowedFilters(
+                AllowedFilter::partial('city'),
+                AllowedFilter::custom('search', new VenueSearchFilter()),
+                AllowedFilter::custom('sport_type', new PitchSportTypeFilter()),
+                AllowedFilter::custom('court_size', new PitchCourtSizeFilter()),
+                AllowedFilter::custom('surface_type', new PitchSurfaceTypeFilter()),
+                AllowedFilter::custom('is_indoor', new PitchIndoorFilter()),
+                AllowedFilter::custom('max_price', new PitchMaxPriceFilter()),
+                AllowedFilter::custom('date', new VenueAvailabilityFilter()),
+                AllowedFilter::callback('time', fn() => null),
+                AllowedFilter::callback('time_from', fn() => null),
+                AllowedFilter::callback('time_to', fn() => null),
+                AllowedFilter::callback('latitude', fn() => null),
+                AllowedFilter::callback('longitude', fn() => null),
+                AllowedFilter::custom('max_distance', new VenueMaxDistanceFilter()),
+            )
+            ->allowedSorts(
+                AllowedSort::custom('distance', new VenueDistanceSort()),
+                AllowedSort::field('name'),
+                AllowedSort::field('city'),
+                AllowedSort::field('created_at'),
+            );
+
+        // ترتيب افتراضي: الأقرب مسافة إذا وُجدت الإحداثيات، أو الأحدث
+        if (!$request->filled('sort')) {
+            if ($hasCoords) {
+                $queryBuilder->orderBy('distance', 'asc');
+            } else {
+                $queryBuilder->latest('tenants.id');
+            }
         }
 
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('tenants.name', 'like', "%{$search}%")
-                  ->orWhere('tenants.address', 'like', "%{$search}%")
-                  ->orWhereHas('pitches', fn ($sub) => $sub->where('status', 'active')->where('name', 'like', "%{$search}%"));
-            });
-        }
+        // 4. تجهيز بارامترات التاريخ والوقت لفلترة الملاعب المحملة مسبقاً (Eager Loading)
+        $searchDate = $request->input('date', $request->input('filter.date'));
+        $searchTime = $request->input('time', $request->input('filter.time'));
+        $timeFrom   = $request->input('time_from', $request->input('filter.time_from'));
+        $timeTo     = $request->input('time_to', $request->input('filter.time_to'));
+        $sportType  = $request->input('sport_type', $request->input('filter.sport_type'));
 
-        // 3. فلاتر الملاعب (نوع الرياضة، المقاس، الأرضية، السعر)
-        if ($request->filled('sport_type')) {
-            $query->whereHas('pitches', fn ($q) => $q->where('status', 'active')->where('sport_type', $request->sport_type));
-        }
+        $formattedTime = $searchTime ? Carbon::parse($searchTime)->format('H:i:s') : null;
+        $formattedFrom = $timeFrom ? Carbon::parse($timeFrom)->format('H:i:s') : null;
+        $formattedTo   = $timeTo ? Carbon::parse($timeTo)->format('H:i:s') : null;
 
-        if ($request->filled('court_size')) {
-            $query->whereHas('pitches', fn ($q) => $q->where('status', 'active')->where('court_size', $request->court_size));
-        }
-
-        if ($request->filled('surface_type')) {
-            $query->whereHas('pitches', fn ($q) => $q->where('status', 'active')->where('surface_type', $request->surface_type));
-        }
-
-        if ($request->has('is_indoor') && $request->input('is_indoor') !== null) {
-            $query->whereHas('pitches', fn ($q) => $q->where('status', 'active')->where('is_indoor', $request->boolean('is_indoor')));
-        }
-
-        if ($request->filled('max_price')) {
-            $maxPrice = (float) $request->max_price;
-            $query->whereHas('pitches', function ($q) use ($maxPrice) {
-                $q->where('status', 'active')
-                  ->where(function ($sub) use ($maxPrice) {
-                      $sub->where('online_day_price', '<=', $maxPrice)
-                          ->orWhere('online_night_price', '<=', $maxPrice);
-                  });
-            });
-        }
-
-        // 4. فلترة التوفر باليوم والساعة (Availability Filter)
-        $searchDate = $request->date;
-        $searchTime = $request->time ? Carbon::parse($request->time)->format('H:i:s') : null;
-        $timeFrom   = $request->time_from ? Carbon::parse($request->time_from)->format('H:i:s') : null;
-        $timeTo     = $request->time_to ? Carbon::parse($request->time_to)->format('H:i:s') : null;
-
-        if (($searchTime || ($timeFrom && $timeTo)) && !$searchDate) {
-            $searchDate = now()->toDateString();
-        }
-
-        if ($searchDate) {
-            $query->whereHas('pitches.slots', function ($q) use ($searchDate, $searchTime, $timeFrom, $timeTo) {
-                $q->availableOnline()->where('date', $searchDate);
-
-                if ($searchTime) {
-                    $q->where('start_time', $searchTime);
-                } elseif ($timeFrom && $timeTo) {
-                    $q->where('start_time', '>=', $timeFrom)
-                      ->where('start_time', '<=', $timeTo);
-                }
-            });
-        }
-
-        // تحميل العلاقات بكفاءة وبدون إرجاع الساعات (لتقليل حجم الـ Payload وسرعة الاستجابة)
-        $query->with([
+        // 5. تحميل العلاقات بكفاءة وبدون إرجاع الساعات (خفيف وسريع للفرونت إند)
+        $queryBuilder->with([
             'media',
-            'pitches' => function ($q) use ($request, $searchDate, $searchTime, $timeFrom, $timeTo) {
-                $q->where('status', 'active')->with('media');
+            'pitches' => function ($pitchQ) use ($sportType, $searchDate, $formattedTime, $formattedFrom, $formattedTo) {
+                $pitchQ->where('status', 'active')->with('media');
 
-                if ($request->filled('sport_type')) {
-                    $q->where('sport_type', $request->sport_type);
+                if (!blank($sportType)) {
+                    if (is_array($sportType)) {
+                        $pitchQ->whereIn('sport_type', $sportType);
+                    } else {
+                        $pitchQ->where('sport_type', $sportType);
+                    }
                 }
 
-                if ($searchDate) {
-                    $q->whereHas('slots', function ($slotQ) use ($searchDate, $searchTime, $timeFrom, $timeTo) {
+                if (!blank($searchDate)) {
+                    $pitchQ->whereHas('slots', function ($slotQ) use ($searchDate, $formattedTime, $formattedFrom, $formattedTo) {
                         $slotQ->availableOnline()->where('date', $searchDate);
-                        if ($searchTime) {
-                            $slotQ->where('start_time', $searchTime);
-                        } elseif ($timeFrom && $timeTo) {
-                            $slotQ->where('start_time', '>=', $timeFrom)->where('start_time', '<=', $timeTo);
+                        if ($formattedTime) {
+                            $slotQ->where('start_time', $formattedTime);
+                        } elseif ($formattedFrom && $formattedTo) {
+                            $slotQ->where('start_time', '>=', $formattedFrom)->where('start_time', '<=', $formattedTo);
                         }
                     });
                 }
@@ -148,11 +141,32 @@ class PlayerPitchExploreController extends Controller
         ]);
 
         $perPage = (int) $request->input('per_page', 15);
-        $venues = $query->paginate($perPage);
+        $venues = $queryBuilder->paginate($perPage)->withQueryString();
 
         return response()->json([
             'success' => true,
-            'data'    => ExploreVenueResource::collection($venues)->response()->getData(true),
+            'message' => 'تم جلب النوادي والملاعب المتاحة بنجاح.',
+            'meta'    => [
+                'applied_filters' => [
+                    'has_coordinates' => $hasCoords,
+                    'latitude'        => $lat,
+                    'longitude'       => $lng,
+                    'sport_type'      => $sportType,
+                    'city'            => $request->input('city', $request->input('filter.city')),
+                    'date'            => $searchDate,
+                    'time'            => $searchTime,
+                    'time_from'       => $timeFrom,
+                    'time_to'         => $timeTo,
+                    'sort'            => $request->input('sort', $hasCoords ? 'distance' : '-created_at'),
+                ],
+                'pagination' => [
+                    'current_page' => $venues->currentPage(),
+                    'per_page'     => $venues->perPage(),
+                    'total'        => $venues->total(),
+                    'last_page'    => $venues->lastPage(),
+                ],
+            ],
+            'data'    => ExploreVenueResource::collection($venues->items()),
         ]);
     }
 

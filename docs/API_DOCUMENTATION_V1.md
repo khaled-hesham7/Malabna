@@ -631,22 +631,36 @@
 
 ### 9.1 استكشاف والبحث في الملاعب بالأقرب مسافة والوقت المتاح (Explore Pitches)
 * **المسار:** `GET /player/explore`
-* **الوظيفة:** البحث الذكي في الملاعب بترتيبها من الأقرب للأبعد مسافة (GPS)، وفلترتها باليوم والساعة الفاضية.
-* **الـ Query Parameters (جميعها اختيارية):**
-  * `latitude`: خط العرض لموقع اللاعب (مثل: `30.0583`).
-  * `longitude`: خط الطول لموقع اللاعب (مثل: `31.2014`).
-  * `max_distance`: أقصى مسافة بالكيلومتر (مثال: `10` للبحث في نطاق 10 كم فقط).
-  * `date`: تاريخ اليوم المراد اللعب فيه بتنسيق `YYYY-MM-DD` (مثال: `2026-11-20`).
-  * `time`: وقت الماتش بالظبط بتنسيق `HH:mm` (مثال: `20:00`).
-  * `time_from` & `time_to`: البحث بنطاق زمني (مثال: `time_from=19:00&time_to=22:00` لأي ساعة فاضية في هذه الفترة).
-  * `sport_type`: نوع الرياضة (مثل: `football`, `padel`, `tennis`).
-  * `court_size`: مقاس الملعب (مثل: `5x5`, `7x7`).
-  * `surface_type`: نوع الأرضية (مثل: `artificial_turf`).
-  * `is_indoor`: صالة مغطاة أم مكشوف (`1` أو `0`).
-  * `city`: فلترة بالمدينة (مثل: `الجيزة`, `القاهرة`).
-  * `max_price`: أقصى سعر أونلاين للساعة.
-  * `search`: كلمة بحث في اسم الملعب أو اسم النادي أو العنوان.
-  * `per_page`: عدد النتائج في الصفحة (افتراضي 15).
+* **المكتبة المستخدمة:** مبني بالكامل على معايير مكتبة **`spatie/laravel-query-builder`**.
+* **الوظيفة:** البحث الذكي في الملاعب بترتيبها من الأقرب للأبعد مسافة (GPS)، وفلترتها باليوم والساعة الفاضية. يدعم صيغة `filter[...]` و `sort` الخاصة بـ Spatie وكذلك يدعم البارامترات المباشرة (Flat Query Parameters) لمرونة وسلاسة استهلاك الـ API من أي عميل.
+* **طرق الاستعلام المدعومة (Query Parameters):**
+
+  1. **صيغة Spatie QueryBuilder القياسية (موصى بها):**
+     * `filter[search]=الأهلي`: البحث في اسم النادي، العنوان، أو اسم الملعب.
+     * `filter[city]=القاهرة`: فلترة بالمدينة.
+     * `filter[sport_type]=football`: نوع الرياضة (`football`, `padel`, `tennis`, إلخ).
+     * `filter[court_size]=5x5`: مقاس الملعب.
+     * `filter[surface_type]=artificial_turf`: نوع الأرضية.
+     * `filter[is_indoor]=1`: صالة مغطاة (1) أو مكشوف (0).
+     * `filter[max_price]=350`: أقصى سعر أونلاين للساعة.
+     * `filter[date]=2026-11-20`: تاريخ اليوم المراد اللعب فيه (`YYYY-MM-DD`).
+     * `filter[time]=20:00`: توقيت محدد للماتش (`HH:mm`).
+     * `filter[time_from]=18:00&filter[time_to]=22:00`: نطاق زمني للبحث عن أي ساعة شاغرة بينهما.
+     * `filter[max_distance]=10`: أقصى مسافة بالكيلومتر من موقع اللاعب (يتطلب إرسال الإحداثيات).
+     * `sort=distance` أو `sort=-distance` أو `sort=name` أو `sort=-created_at`: معيار الترتيب.
+
+  2. **صيغة البارامترات المباشرة (Flat Parameters):**
+     * `latitude`: خط العرض لموقع اللاعب (مثل: `30.0583`).
+     * `longitude`: خط الطول لموقع اللاعب (مثل: `31.2014`).
+     * `date`, `time`, `time_from`, `time_to`, `sport_type`, `city`, `search`, `max_distance`, `max_price`, `per_page`.
+
+* **مثال طلب متكامل (Full Request Example):**
+```http
+GET /api/v1/player/explore?latitude=30.0583&longitude=31.2014&filter[sport_type]=football&filter[date]=2026-11-20&filter[time]=20:00&sort=distance HTTP/1.1
+Host: 127.0.0.1:8000
+Accept: application/json
+```
+
 * **نموذج الاستجابة (200 OK):**
 ```json
 {

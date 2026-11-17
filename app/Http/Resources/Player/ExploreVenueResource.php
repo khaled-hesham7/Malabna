@@ -72,3 +72,4 @@ class ExploreVenueResource extends JsonResource
         ];
     }
 }
+

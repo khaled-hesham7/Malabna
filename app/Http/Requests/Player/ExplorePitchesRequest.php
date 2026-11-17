@@ -11,6 +11,46 @@ class ExplorePitchesRequest extends FormRequest
         return true;
     }
 
+    /**
+     * مزامنة المتغيرات بين صيغة filter[...] والصيغة المباشرة لدعم Spatie QueryBuilder بسلاسة
+     */
+    protected function prepareForValidation(): void
+    {
+        // 1. إذا أرسل العميل معايير داخل مصفوفة filter[...]، نسحبها أيضاً للـ root لتمرير التحقق
+        if ($this->has('filter') && is_array($this->input('filter'))) {
+            $filter = $this->input('filter');
+            $merged = [];
+            foreach ($filter as $key => $value) {
+                if (!$this->has($key)) {
+                    $merged[$key] = $value;
+                }
+            }
+            if (!empty($merged)) {
+                $this->merge($merged);
+            }
+        }
+
+        // 2. إذا أرسل العميل معايير مباشرة (Flat Query Params)، ندمجها داخل filter ليراها Spatie QueryBuilder
+        $filterKeys = [
+            'search', 'city', 'sport_type', 'court_size', 'surface_type',
+            'is_indoor', 'max_price', 'date', 'time', 'time_from', 'time_to',
+            'max_distance'
+        ];
+
+        $currentFilters = $this->input('filter', []);
+        $newFilters = is_array($currentFilters) ? $currentFilters : [];
+
+        foreach ($filterKeys as $key) {
+            if ($this->filled($key) && !isset($newFilters[$key])) {
+                $newFilters[$key] = $this->input($key);
+            }
+        }
+
+        if (!empty($newFilters)) {
+            $this->merge(['filter' => $newFilters]);
+        }
+    }
+
     public function rules(): array
     {
         return [
@@ -34,7 +74,8 @@ class ExplorePitchesRequest extends FormRequest
             'max_price'    => ['nullable', 'numeric', 'min:0'],
             'search'       => ['nullable', 'string', 'max:100'],
 
-            // الترقيم والتنقل
+            // الترتيب والتنقل
+            'sort'         => ['nullable', 'string'],
             'per_page'     => ['nullable', 'integer', 'min:1', 'max:50'],
         ];
     }
@@ -55,4 +96,3 @@ class ExplorePitchesRequest extends FormRequest
         ];
     }
 }
-
